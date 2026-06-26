@@ -68,6 +68,9 @@ services:
       RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
       RAPHAEL_AUDIT_URL: http://raphael-audit:8093
       RAPHAEL_GRAPH_URL: http://raphael-graph:8100
+      RAPHAEL_AI_URL: http://raphael-ai:8104
+      RAPHAEL_ADMIN_URL: http://raphael-admin:8106
+      RAPHAEL_ARTIFACTS_URL: http://raphael-artifacts:8107
       RAPHAEL_ORGS_URL: http://raphael-orgs:8082
       RAPHAEL_SYNC_URL: http://raphael-sync:8098
       RAPHAEL_OPS_URL: http://raphael-ops:8103
@@ -177,6 +180,39 @@ services:
         SERVICE_MODULE: raphael_graph.app:app
     ports:
       - "8100:8100"
+
+  raphael-ai:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-ai
+        SERVICE_PORT: 8104
+        SERVICE_MODULE: raphael_ai.app:app
+    ports:
+      - "8104:8104"
+
+  raphael-admin:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-admin
+        SERVICE_PORT: 8106
+        SERVICE_MODULE: raphael_admin.app:app
+    ports:
+      - "8106:8106"
+
+  raphael-artifacts:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-artifacts
+        SERVICE_PORT: 8107
+        SERVICE_MODULE: raphael_artifacts.app:app
+    ports:
+      - "8107:8107"
 
   raphael-orgs:
     build:

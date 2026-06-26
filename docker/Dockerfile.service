@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir uv
 
 COPY raphael-contracts /deps/raphael-contracts
 RUN uv pip install --system /deps/raphael-contracts
+COPY raphael-audit /deps/raphael-audit
+RUN uv pip install --system /deps/raphael-audit
 
 COPY ${SERVICE_NAME}/pyproject.toml ${SERVICE_NAME}/README.md ./
 COPY ${SERVICE_NAME}/src ./src
