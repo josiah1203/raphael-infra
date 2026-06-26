@@ -1,0 +1,131 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: raphael
+      POSTGRES_PASSWORD: raphael
+      POSTGRES_DB: raphael
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raphael"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.4
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr=internal://redpanda:9092,external://localhost:19092
+    ports:
+      - "19092:19092"
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: raphael
+      MINIO_ROOT_PASSWORD: raphaeldev
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - miniodata:/data
+
+  raphael-core:
+    build:
+      context: ../raphael-core
+    ports:
+      - "8080:8080"
+    env_file: services.env.example
+    environment:
+      RAPHAEL_IDENTITY_URL: http://raphael-identity:8081
+      RAPHAEL_WORKSPACES_URL: http://raphael-workspaces:8083
+      RAPHAEL_REVIEWS_URL: http://raphael-reviews:8087
+      RAPHAEL_AUTOMATION_URL: http://raphael-automation:8095
+      RAPHAEL_CONNECTORS_URL: http://raphael-connectors:8096
+      RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
+      RAPHAEL_AUDIT_URL: http://raphael-audit:8093
+      RAPHAEL_GRAPH_URL: http://raphael-graph:8100
+    depends_on:
+      - raphael-identity
+      - raphael-workspaces
+      - raphael-reviews
+      - raphael-notifications
+
+  raphael-identity:
+    build:
+      context: ../raphael-identity
+    ports:
+      - "8081:8081"
+    environment:
+      RAPHAEL_JWT_SECRET: dev-secret-with-32-byte-minimum-length!!
+      RAPHAEL_DATABASE_URL: postgresql://raphael:raphael@postgres:5432/raphael
+
+  raphael-workspaces:
+    build:
+      context: ../raphael-workspaces
+    ports:
+      - "8083:8083"
+
+  raphael-reviews:
+    build:
+      context: ../raphael-reviews
+    ports:
+      - "8087:8087"
+    environment:
+      RAPHAEL_KAFKA_BROKERS: redpanda:9092
+
+  raphael-automation:
+    build:
+      context: ../raphael-automation
+    ports:
+      - "8095:8095"
+
+  raphael-connectors:
+    build:
+      context: ../raphael-connectors
+    ports:
+      - "8096:8096"
+
+  raphael-notifications:
+    build:
+      context: ../raphael-notifications
+    ports:
+      - "8090:8090"
+    environment:
+      RAPHAEL_KAFKA_BROKERS: redpanda:9092
+      RAPHAEL_NOTIFICATIONS_POSTMARK_TOKEN: ${RAPHAEL_NOTIFICATIONS_POSTMARK_TOKEN:-}
+      RAPHAEL_NOTIFICATIONS_FROM_EMAIL: notifications@raphael.app
+
+  raphael-audit:
+    build:
+      context: ../raphael-audit
+    ports:
+      - "8093:8093"
+
+  raphael-graph:
+    build:
+      context: ../raphael-graph
+    ports:
+      - "8100:8100"
+
+volumes:
+  pgdata:
+  miniodata:
