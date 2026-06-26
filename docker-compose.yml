@@ -68,6 +68,11 @@ services:
       RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
       RAPHAEL_AUDIT_URL: http://raphael-audit:8093
       RAPHAEL_GRAPH_URL: http://raphael-graph:8100
+      RAPHAEL_ORGS_URL: http://raphael-orgs:8082
+      RAPHAEL_SYNC_URL: http://raphael-sync:8098
+      RAPHAEL_OPS_URL: http://raphael-ops:8103
+      RAPHAEL_RWU_URL: http://raphael-rwu:8101
+      RAPHAEL_JWT_SECRET: dev-secret-with-32-byte-minimum-length!!
     depends_on:
       - raphael-identity
       - raphael-workspaces
@@ -172,6 +177,52 @@ services:
         SERVICE_MODULE: raphael_graph.app:app
     ports:
       - "8100:8100"
+
+  raphael-orgs:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-orgs
+        SERVICE_PORT: 8082
+        SERVICE_MODULE: raphael_orgs.app:app
+    ports:
+      - "8082:8082"
+    environment:
+      RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
+
+  raphael-sync:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-sync
+        SERVICE_PORT: 8098
+        SERVICE_MODULE: raphael_sync.app:app
+    ports:
+      - "8098:8098"
+
+  raphael-ops:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-ops
+        SERVICE_PORT: 8103
+        SERVICE_MODULE: raphael_ops.app:app
+    ports:
+      - "8103:8103"
+
+  raphael-rwu:
+    build:
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-rwu
+        SERVICE_PORT: 8101
+        SERVICE_MODULE: raphael_rwu.app:app
+    ports:
+      - "8101:8101"
 
   raphael-ui:
     build:
