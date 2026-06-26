@@ -262,8 +262,8 @@ services:
 
   raphael-ui:
     build:
-      context: ../raphael-ui
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: raphael-ui/Dockerfile
     ports:
       - "5173:80"
     depends_on:
