@@ -1,0 +1,27 @@
+# Build from Raphael Projects root:
+#   docker build -f raphael-infra/docker/Dockerfile.service \
+#     --build-arg SERVICE_NAME=raphael-audit \
+#     --build-arg SERVICE_PORT=8093 \
+#     --build-arg SERVICE_MODULE=raphael_audit.app:app \
+#     .
+FROM python:3.11-slim
+ARG SERVICE_NAME
+ARG SERVICE_PORT=8080
+ARG SERVICE_MODULE
+WORKDIR /app
+RUN pip install --no-cache-dir uv
+
+COPY raphael-contracts /deps/raphael-contracts
+RUN uv pip install --system /deps/raphael-contracts
+
+COPY ${SERVICE_NAME}/pyproject.toml ${SERVICE_NAME}/README.md ./
+COPY ${SERVICE_NAME}/src ./src
+
+# Contracts pre-installed; drop local path source for container install
+RUN python3 -c "import re; from pathlib import Path; p=Path('pyproject.toml'); p.write_text(re.sub(r'\n\[tool\.uv\.sources\][^\[]*','\n',p.read_text(),flags=re.S))"
+
+RUN uv pip install --system -e .
+
+ENV RAPHAEL_SERVICE_PORT=${SERVICE_PORT}
+EXPOSE ${SERVICE_PORT}
+CMD uvicorn ${SERVICE_MODULE} --host 0.0.0.0 --port ${SERVICE_PORT}

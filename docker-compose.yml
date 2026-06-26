@@ -50,7 +50,12 @@ services:
 
   raphael-core:
     build:
-      context: ../raphael-core
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-core
+        SERVICE_PORT: 8080
+        SERVICE_MODULE: raphael_core.app:app
     ports:
       - "8080:8080"
     env_file: services.env.example
@@ -71,7 +76,12 @@ services:
 
   raphael-identity:
     build:
-      context: ../raphael-identity
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-identity
+        SERVICE_PORT: 8081
+        SERVICE_MODULE: raphael_identity.app:app
     ports:
       - "8081:8081"
     environment:
@@ -80,33 +90,60 @@ services:
 
   raphael-workspaces:
     build:
-      context: ../raphael-workspaces
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-workspaces
+        SERVICE_PORT: 8083
+        SERVICE_MODULE: raphael_workspaces.app:app
     ports:
       - "8083:8083"
 
   raphael-reviews:
     build:
-      context: ../raphael-reviews
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-reviews
+        SERVICE_PORT: 8087
+        SERVICE_MODULE: raphael_reviews.app:app
     ports:
       - "8087:8087"
     environment:
       RAPHAEL_KAFKA_BROKERS: redpanda:9092
+      RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
+      RAPHAEL_WORKSPACES_URL: http://raphael-workspaces:8083
 
   raphael-automation:
     build:
-      context: ../raphael-automation
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-automation
+        SERVICE_PORT: 8095
+        SERVICE_MODULE: raphael_automation.app:app
     ports:
       - "8095:8095"
 
   raphael-connectors:
     build:
-      context: ../raphael-connectors
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-connectors
+        SERVICE_PORT: 8096
+        SERVICE_MODULE: raphael_connectors.app:app
     ports:
       - "8096:8096"
 
   raphael-notifications:
     build:
-      context: ../raphael-notifications
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-notifications
+        SERVICE_PORT: 8090
+        SERVICE_MODULE: raphael_notifications.app:app
     ports:
       - "8090:8090"
     environment:
@@ -116,15 +153,34 @@ services:
 
   raphael-audit:
     build:
-      context: ../raphael-audit
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-audit
+        SERVICE_PORT: 8093
+        SERVICE_MODULE: raphael_audit.app:app
     ports:
       - "8093:8093"
 
   raphael-graph:
     build:
-      context: ../raphael-graph
+      context: ..
+      dockerfile: raphael-infra/docker/Dockerfile.service
+      args:
+        SERVICE_NAME: raphael-graph
+        SERVICE_PORT: 8100
+        SERVICE_MODULE: raphael_graph.app:app
     ports:
       - "8100:8100"
+
+  raphael-ui:
+    build:
+      context: ../raphael-ui
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - raphael-core
 
 volumes:
   pgdata:

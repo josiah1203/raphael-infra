@@ -5,14 +5,16 @@ Local development stack: API gateway, domain services, event bus, object store, 
 ## Quick start
 
 ```bash
-# Install shared contracts first
-cd ../raphael-contracts && uv sync
-
-# Start full stack
+# Build context is ~/Projects (parent of each service repo)
+cd ~/Projects/raphael-infra
 docker compose up -d
+```
 
-# Or run gateway + services natively (see services.env)
-source services.env
+Docker builds copy `raphael-contracts` from the sibling repo automatically via `docker/Dockerfile.service`.
+
+```bash
+# Install shared contracts first (native dev)
+cd ../raphael-contracts && uv sync
 ```
 
 ## Services
