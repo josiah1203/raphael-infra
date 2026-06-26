@@ -76,6 +76,7 @@ services:
       RAPHAEL_OPS_URL: http://raphael-ops:8103
       RAPHAEL_RWU_URL: http://raphael-rwu:8101
       RAPHAEL_JWT_SECRET: dev-secret-with-32-byte-minimum-length!!
+      RAPHAEL_PUBLIC_API_BASE: http://localhost:5173
     depends_on:
       - raphael-identity
       - raphael-workspaces
