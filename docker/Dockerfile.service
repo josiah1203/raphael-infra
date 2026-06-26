@@ -24,6 +24,8 @@ RUN python3 -c "import re; from pathlib import Path; p=Path('pyproject.toml'); p
 
 RUN uv pip install --system -e .
 
+ENV SERVICE_MODULE=${SERVICE_MODULE}
 ENV RAPHAEL_SERVICE_PORT=${SERVICE_PORT}
+ENV SERVICE_PORT=${SERVICE_PORT}
 EXPOSE ${SERVICE_PORT}
 CMD uvicorn ${SERVICE_MODULE} --host 0.0.0.0 --port ${SERVICE_PORT}
