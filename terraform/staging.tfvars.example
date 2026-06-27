@@ -1,0 +1,9 @@
+environment = "staging"
+aws_region  = "us-east-1"
+project     = "raphael"
+
+db_instance_class       = "db.t4g.micro"
+db_allocated_storage_gb = 20
+
+gateway_desired_count     = 1
+core_service_desired_count = 1

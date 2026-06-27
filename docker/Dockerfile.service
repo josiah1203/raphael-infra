@@ -11,10 +11,13 @@ ARG SERVICE_MODULE
 WORKDIR /app
 RUN pip install --no-cache-dir uv
 
+# Shared contracts + optional path deps used by several services
 COPY raphael-contracts /deps/raphael-contracts
-RUN uv pip install --system /deps/raphael-contracts
 COPY raphael-audit /deps/raphael-audit
-RUN uv pip install --system /deps/raphael-audit
+COPY raphael-artifacts /deps/raphael-artifacts
+RUN uv pip install --system /deps/raphael-contracts \
+ && uv pip install --system /deps/raphael-audit \
+ && uv pip install --system /deps/raphael-artifacts
 
 COPY ${SERVICE_NAME}/pyproject.toml ${SERVICE_NAME}/README.md ./
 COPY ${SERVICE_NAME}/src ./src
