@@ -21,6 +21,17 @@ chmod +x install.sh
 
 Open http://localhost:5173 and complete **Sign up** to create the first organization. No seeded demo data is included.
 
+### Images not on GHCR yet?
+
+Release images publish when a `v*` tag is pushed (see `.github/workflows/release.yml`). Until then, build from your polyrepo checkout:
+
+```bash
+./install.sh --local
+# or set RAPHAEL_BUILD_LOCAL=1 in release/.env
+```
+
+This uses `raphael-infra/docker-compose.yml` and builds from sibling repos under `~/Projects/`.
+
 ## Environment variables
 
 Copy `release/.env.selfhost.example` to `release/.env`.
