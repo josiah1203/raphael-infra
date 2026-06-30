@@ -1,0 +1,141 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/hblabs
+
+jobs:
+  build-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service:
+          - raphael-core
+          - raphael-identity
+          - raphael-orgs
+          - raphael-workspaces
+          - raphael-audit
+          - raphael-reviews
+          - raphael-automation
+          - raphael-connectors
+          - raphael-notifications
+          - raphael-ai
+          - raphael-admin
+          - raphael-rwu
+          - raphael-sync
+          - raphael-graph
+          - raphael-ops
+          - raphael-contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: raphael-monorepo
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract version
+        id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        env:
+          SVC: ${{ matrix.service }}
+        run: |
+          PKG="${SVC//-/_}"
+          PORT=$(case "$SVC" in
+            raphael-core) echo 8080 ;;
+            raphael-identity) echo 8081 ;;
+            raphael-orgs) echo 8082 ;;
+            raphael-workspaces) echo 8083 ;;
+            raphael-reviews) echo 8087 ;;
+            raphael-automation) echo 8095 ;;
+            raphael-connectors) echo 8096 ;;
+            raphael-notifications) echo 8090 ;;
+            raphael-audit) echo 8093 ;;
+            raphael-graph) echo 8100 ;;
+            raphael-sync) echo 8098 ;;
+            raphael-ops) echo 8103 ;;
+            raphael-rwu) echo 8101 ;;
+            raphael-ai) echo 8104 ;;
+            raphael-admin) echo 8106 ;;
+            raphael-contracts) echo 8099 ;;
+            *) echo 8080 ;;
+          esac)
+          if [[ "$SVC" == "raphael-contracts" ]]; then
+            MODULE="raphael_contracts.db:run_migrations"
+          else
+            MODULE="${PKG}.app:app"
+          fi
+          docker build \
+            -f raphael-monorepo/raphael-infra/docker/Dockerfile.service \
+            --build-arg SERVICE_NAME="$SVC" \
+            --build-arg SERVICE_PORT="$PORT" \
+            --build-arg SERVICE_MODULE="$MODULE" \
+            -t "${{ env.IMAGE_PREFIX }}/${SVC}:${{ steps.ver.outputs.version }}" \
+            -t "${{ env.IMAGE_PREFIX }}/${SVC}:latest" \
+            raphael-monorepo
+          docker push "${{ env.IMAGE_PREFIX }}/${SVC}:${{ steps.ver.outputs.version }}"
+          docker push "${{ env.IMAGE_PREFIX }}/${SVC}:latest"
+
+  build-ui:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: raphael-monorepo
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: raphael-monorepo
+          file: raphael-monorepo/raphael-ui/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/hblabs/raphael-ui:${{ steps.ver.outputs.version }}
+            ghcr.io/hblabs/raphael-ui:latest
+
+  bundle:
+    needs: [build-push, build-ui]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: ver
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create self-host tarball
+        run: |
+          tar czvf "raphael-selfhost-${{ steps.ver.outputs.version }}.tar.gz" \
+            release/docker-compose.release.yml \
+            release/install.sh \
+            release/.env.selfhost.example \
+            DEPLOY.md
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: raphael-selfhost-bundle
+          path: raphael-selfhost-${{ steps.ver.outputs.version }}.tar.gz

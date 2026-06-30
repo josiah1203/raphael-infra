@@ -1,0 +1,239 @@
+# Raphael self-hosted release stack — pinned images (no local build contexts).
+# Set RAPHAEL_REGISTRY and RAPHAEL_VERSION in .env (see .env.selfhost.example).
+
+x-raphael-healthcheck: &raphael-healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 5
+  start_period: 25s
+
+x-raphael-db-env: &raphael-db-env
+  RAPHAEL_DATABASE_URL: postgresql://raphael:${POSTGRES_PASSWORD}@postgres:5432/raphael
+  RAPHAEL_RELEASE: "1"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: raphael
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: raphael
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raphael"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    image: ${RAPHAEL_REGISTRY}/raphael-contracts:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    entrypoint: ["python", "-c", "from raphael_contracts.db import run_migrations; run_migrations(); print('migrations complete')"]
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.4
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp=1
+      - --memory=512M
+      - --reserve-memory=0M
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=internal://0.0.0.0:9092
+      - --advertise-kafka-addr=internal://redpanda:9092
+    healthcheck:
+      test: ["CMD", "rpk", "cluster", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:RELEASE.2024-09-13T20-26-02Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: raphael
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-raphaeldev}
+    volumes:
+      - miniodata:/data
+
+  minio-init:
+    image: minio/mc:RELEASE.2024-09-16T17-43-14Z
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 raphael ${MINIO_ROOT_PASSWORD:-raphaeldev} &&
+      mc mb --ignore-existing local/raphael-artifacts &&
+      mc mb --ignore-existing local/raphael-backups
+      "
+    restart: "no"
+
+  raphael-identity:
+    image: ${RAPHAEL_REGISTRY}/raphael-identity:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_JWT_SECRET: ${RAPHAEL_JWT_SECRET}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      <<: *raphael-healthcheck
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health')\""]
+
+  raphael-orgs:
+    image: ${RAPHAEL_REGISTRY}/raphael-orgs:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-workspaces:
+    image: ${RAPHAEL_REGISTRY}/raphael-workspaces:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_AI_URL: http://raphael-ai:8104
+      RAPHAEL_KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-audit:
+    image: ${RAPHAEL_REGISTRY}/raphael-audit:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-reviews:
+    image: ${RAPHAEL_REGISTRY}/raphael-reviews:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-automation:
+    image: ${RAPHAEL_REGISTRY}/raphael-automation:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-connectors:
+    image: ${RAPHAEL_REGISTRY}/raphael-connectors:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-notifications:
+    image: ${RAPHAEL_REGISTRY}/raphael-notifications:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_NOTIFICATIONS_POSTMARK_TOKEN: ${RAPHAEL_NOTIFICATIONS_POSTMARK_TOKEN:-}
+      RAPHAEL_NOTIFICATIONS_FROM_EMAIL: ${RAPHAEL_NOTIFICATIONS_FROM_EMAIL:-notifications@raphael.app}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  raphael-ai:
+    image: ${RAPHAEL_REGISTRY}/raphael-ai:${RAPHAEL_VERSION}
+    environment:
+      RAPHAEL_MODEL_BACKEND: stub
+    healthcheck:
+      <<: *raphael-healthcheck
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8104/health')\""]
+
+  raphael-admin:
+    image: ${RAPHAEL_REGISTRY}/raphael-admin:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_STRIPE_SECRET_KEY: ${RAPHAEL_STRIPE_SECRET_KEY:-}
+
+  raphael-rwu:
+    image: ${RAPHAEL_REGISTRY}/raphael-rwu:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_RWU_DAILY_LIMIT: ${RAPHAEL_RWU_DAILY_LIMIT:-500}
+
+  raphael-sync:
+    image: ${RAPHAEL_REGISTRY}/raphael-sync:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_KAFKA_BROKERS: redpanda:9092
+
+  raphael-graph:
+    image: ${RAPHAEL_REGISTRY}/raphael-graph:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+
+  raphael-ops:
+    image: ${RAPHAEL_REGISTRY}/raphael-ops:${RAPHAEL_VERSION}
+    environment:
+      <<: *raphael-db-env
+      RAPHAEL_AUDIT_URL: http://raphael-audit:8093
+      RAPHAEL_MINIO_ENDPOINT: minio:9000
+      RAPHAEL_MINIO_ACCESS_KEY: raphael
+      RAPHAEL_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-raphaeldev}
+      RAPHAEL_MINIO_SECURE: "false"
+
+  raphael-core:
+    image: ${RAPHAEL_REGISTRY}/raphael-core:${RAPHAEL_VERSION}
+    ports:
+      - "8080:8080"
+    environment:
+      RAPHAEL_JWT_SECRET: ${RAPHAEL_JWT_SECRET}
+      RAPHAEL_PUBLIC_API_BASE: ${RAPHAEL_PUBLIC_API_BASE}
+      RAPHAEL_DEPLOYMENT_MODE: ${RAPHAEL_DEPLOYMENT_MODE:-self_hosted}
+      RAPHAEL_CLOUD_API_KEY: ${RAPHAEL_CLOUD_API_KEY:-}
+      RAPHAEL_CLOUD_PLAN: ${RAPHAEL_CLOUD_PLAN:-team}
+      RAPHAEL_CLOUD_ORG_NAME: ${RAPHAEL_CLOUD_ORG_NAME:-}
+      RAPHAEL_IDENTITY_URL: http://raphael-identity:8081
+      RAPHAEL_ORGS_URL: http://raphael-orgs:8082
+      RAPHAEL_WORKSPACES_URL: http://raphael-workspaces:8083
+      RAPHAEL_REVIEWS_URL: http://raphael-reviews:8087
+      RAPHAEL_AUTOMATION_URL: http://raphael-automation:8095
+      RAPHAEL_CONNECTORS_URL: http://raphael-connectors:8096
+      RAPHAEL_NOTIFICATIONS_URL: http://raphael-notifications:8090
+      RAPHAEL_AUDIT_URL: http://raphael-audit:8093
+      RAPHAEL_GRAPH_URL: http://raphael-graph:8100
+      RAPHAEL_AI_URL: http://raphael-ai:8104
+      RAPHAEL_ADMIN_URL: http://raphael-admin:8106
+      RAPHAEL_SYNC_URL: http://raphael-sync:8098
+      RAPHAEL_OPS_URL: http://raphael-ops:8103
+      RAPHAEL_RWU_URL: http://raphael-rwu:8101
+      RAPHAEL_KAFKA_DISABLED: ${RAPHAEL_KAFKA_DISABLED:-0}
+    depends_on:
+      - raphael-identity
+      - raphael-workspaces
+      - raphael-audit
+      - raphael-orgs
+    healthcheck:
+      <<: *raphael-healthcheck
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')\""]
+
+  raphael-ui:
+    image: ${RAPHAEL_REGISTRY}/raphael-ui:${RAPHAEL_VERSION}
+    ports:
+      - "${RAPHAEL_UI_PORT:-5173}:80"
+    depends_on:
+      - raphael-core
+
+volumes:
+  pgdata:
+  miniodata:

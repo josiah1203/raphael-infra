@@ -75,3 +75,14 @@ Copy `services.env.example` to `services.env` and set `RAPHAEL_NOTIFICATIONS_POS
 
 Observability defaults: `RAPHAEL_LOG_FORMAT=json`, Prometheus at `/metrics`.
 
+## Self-hosted release
+
+Production installs use pinned container images (no local build):
+
+```bash
+cd release
+./install.sh
+```
+
+See [`DEPLOY.md`](DEPLOY.md) for environment variables, Raphael Cloud API key setup, and operations. Polyrepo dev workflow above is unchanged for day-to-day engineering.
+
